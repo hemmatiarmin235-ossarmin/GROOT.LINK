@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Reset for root div */
+#root {
+  display: none;
+}

@@ -1,0 +1,2936 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LOCAL SHARE — اشتراک‌گذاری خصوصی بین دستگاه‌ها</title>
+  <meta name="description" content="انتقال فایل و متن بین دستگاه‌ها با WebRTC - بدون سرور، بدون آپلود">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js" defer></script>
+  <style>
+    :root {
+      --bg-primary: #07090f;
+      --bg-secondary: #0b1020;
+      --bg-card: rgba(15, 20, 40, 0.7);
+      --bg-card-hover: rgba(20, 28, 55, 0.8);
+      --border-color: rgba(100, 140, 255, 0.12);
+      --border-hover: rgba(100, 180, 255, 0.3);
+      --text-primary: #e8ecf4;
+      --text-secondary: #8892a8;
+      --text-muted: #5a6380;
+      --accent-cyan: #00d4ff;
+      --accent-blue: #4f7cff;
+      --accent-purple: #8b5cf6;
+      --accent-gradient: linear-gradient(135deg, #00d4ff, #4f7cff, #8b5cf6);
+      --accent-glow: 0 0 20px rgba(0, 212, 255, 0.3);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
+      --shadow-glow: 0 0 30px rgba(79, 124, 255, 0.15);
+      --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #f0f2f8;
+      --bg-secondary: #e8ebf2;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --bg-card-hover: rgba(255, 255, 255, 0.95);
+      --border-color: rgba(0, 0, 0, 0.08);
+      --border-hover: rgba(79, 124, 255, 0.3);
+      --text-primary: #1a1d2e;
+      --text-secondary: #5a6380;
+      --text-muted: #8892a8;
+      --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Override Tailwind reset */
+    h1, h2, h3, h4, h5, h6 {
+      font-size: revert;
+      font-weight: revert;
+    }
+
+    button, input, select, textarea {
+      border-radius: revert;
+      background: revert;
+    }
+
+    img:not(.image-preview):not(.qr-container img) {
+      display: revert;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-system);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(79, 124, 255, 0.03) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(79, 124, 255, 0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(79, 124, 255, 0.5); }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 9, 15, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+    }
+
+    [data-theme="light"] .header {
+      background: rgba(240, 242, 248, 0.9);
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent-gradient);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: var(--accent-glow);
+    }
+
+    .logo-text h1 {
+      font-size: 18px;
+      font-weight: 700;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 1px;
+    }
+
+    .logo-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .connection-badge.connected {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .connection-badge.connecting {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--error);
+    }
+
+    .connected .status-dot {
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    .connecting .status-dot {
+      background: var(--warning);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    .device-name {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: var(--transition);
+    }
+
+    .device-name:hover {
+      border-color: var(--border-hover);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+      font-size: 16px;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-card-hover);
+      color: var(--accent-cyan);
+      border-color: var(--border-hover);
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== DASHBOARD CARDS ===== */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .dash-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dash-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent-gradient);
+      opacity: 0;
+      transition: var(--transition);
+    }
+
+    .dash-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .dash-card:hover::before {
+      opacity: 1;
+    }
+
+    .dash-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 24px;
+    }
+
+    .dash-card-icon.blue { background: rgba(79, 124, 255, 0.15); }
+    .dash-card-icon.cyan { background: rgba(0, 212, 255, 0.15); }
+    .dash-card-icon.purple { background: rgba(139, 92, 246, 0.15); }
+    .dash-card-icon.green { background: rgba(16, 185, 129, 0.15); }
+    .dash-card-icon.orange { background: rgba(245, 158, 11, 0.15); }
+    .dash-card-icon.pink { background: rgba(236, 72, 153, 0.15); }
+
+    .dash-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .dash-card p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* ===== DROP ZONE ===== */
+    .drop-zone {
+      background: var(--bg-card);
+      border: 2px dashed var(--border-color);
+      border-radius: var(--radius-xl);
+      padding: 48px 24px;
+      text-align: center;
+      transition: var(--transition);
+      margin-bottom: 24px;
+      cursor: pointer;
+    }
+
+    .drop-zone.drag-over {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 212, 255, 0.05);
+      box-shadow: inset 0 0 30px rgba(0, 212, 255, 0.05);
+    }
+
+    .drop-zone-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .drop-zone h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .drop-zone p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .drop-zone .btn {
+      margin-top: 16px;
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      border: none;
+      font-family: inherit;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: white;
+      box-shadow: 0 4px 15px rgba(79, 124, 255, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(79, 124, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-hover);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-lg {
+      padding: 14px 28px;
+      font-size: 16px;
+    }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: var(--transition);
+    }
+
+    .modal-close:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    /* ===== FORM ELEMENTS ===== */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      transition: var(--transition);
+      direction: rtl;
+    }
+
+    [data-theme="light"] .form-input,
+    [data-theme="light"] .form-textarea {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .form-input:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.15);
+    }
+
+    .form-textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .form-input::placeholder, .form-textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* ===== TABS ===== */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-md);
+      margin-bottom: 20px;
+    }
+
+    [data-theme="light"] .tabs {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      font-family: inherit;
+    }
+
+    .tab.active {
+      background: var(--accent-gradient);
+      color: white;
+      box-shadow: 0 2px 8px rgba(79, 124, 255, 0.3);
+    }
+
+    .tab:hover:not(.active) {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* ===== TRANSFER PROGRESS ===== */
+    .transfer-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .transfer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .transfer-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 70%;
+    }
+
+    .transfer-size {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-gradient);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .transfer-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ===== TOAST ===== */
+    .toast-container {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .toast {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      box-shadow: var(--shadow-card);
+      animation: toastIn 0.3s ease;
+      pointer-events: auto;
+    }
+
+    .toast.removing {
+      animation: toastOut 0.3s ease forwards;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+
+    .toast-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .toast.success { border-color: rgba(16, 185, 129, 0.3); }
+    .toast.error { border-color: rgba(239, 68, 68, 0.3); }
+    .toast.warning { border-color: rgba(245, 158, 11, 0.3); }
+    .toast.info { border-color: rgba(79, 124, 255, 0.3); }
+
+    /* ===== COMMAND PALETTE ===== */
+    .command-palette {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 3000;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 15vh;
+    }
+
+    .command-palette.active {
+      display: flex;
+    }
+
+    .command-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      width: 90%;
+      max-width: 520px;
+      overflow: hidden;
+      animation: slideUp 0.2s ease;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .command-input {
+      width: 100%;
+      padding: 16px 20px;
+      border: none;
+      border-bottom: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-primary);
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      direction: rtl;
+    }
+
+    .command-list {
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .command-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .command-item:hover, .command-item.selected {
+      background: rgba(79, 124, 255, 0.1);
+    }
+
+    .command-item-icon {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+    }
+
+    /* ===== CONNECTION STEPS ===== */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .step-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent-gradient);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .signaling-data {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      word-break: break-all;
+      max-height: 120px;
+      overflow-y: auto;
+      margin: 12px 0;
+      direction: ltr;
+      text-align: left;
+    }
+
+    [data-theme="light"] .signaling-data {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* ===== QR CODE ===== */
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0;
+      padding: 16px;
+      background: white;
+      border-radius: var(--radius-md);
+    }
+
+    .qr-container canvas, .qr-container img {
+      max-width: 200px;
+      max-height: 200px;
+    }
+
+    /* ===== HISTORY ===== */
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin-bottom: 8px;
+      transition: var(--transition);
+    }
+
+    .history-item:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .history-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .history-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .history-name {
+      font-size: 13px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .history-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ===== SETTINGS ===== */
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .setting-item:last-child {
+      border-bottom: none;
+    }
+
+    .setting-label {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .setting-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .toggle {
+      width: 44px;
+      height: 24px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition);
+    }
+
+    .toggle.active {
+      background: var(--accent-blue);
+    }
+
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      transition: var(--transition);
+    }
+
+    .toggle.active::after {
+      left: 23px;
+    }
+
+    /* ===== DIAGNOSTICS ===== */
+    .diag-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px;
+    }
+
+    .diag-label {
+      color: var(--text-secondary);
+    }
+
+    .diag-value {
+      font-weight: 500;
+      direction: ltr;
+    }
+
+    .diag-value.yes { color: var(--success); }
+    .diag-value.no { color: var(--error); }
+    .diag-value.connected { color: var(--success); }
+    .diag-value.disconnected { color: var(--error); }
+
+    /* ===== RECEIVED FILES ===== */
+    .received-file {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .received-file-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: rgba(16, 185, 129, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .received-file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .received-file-name {
+      font-size: 14px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .received-file-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ===== IMAGE PREVIEW ===== */
+    .image-preview {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: var(--radius-md);
+      margin: 12px 0;
+      object-fit: contain;
+    }
+
+    /* ===== TEXT RECEIVED ===== */
+    .text-received {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin: 12px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 14px;
+      max-height: 200px;
+      overflow-y: auto;
+      direction: rtl;
+    }
+
+    [data-theme="light"] .text-received {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    /* ===== SECURITY INFO ===== */
+    .security-box {
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin: 16px 0;
+    }
+
+    .security-box h4 {
+      color: var(--success);
+      font-size: 14px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .security-box ul {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .security-box li {
+      padding: 4px 0;
+      padding-right: 16px;
+      position: relative;
+    }
+
+    .security-box li::before {
+      content: '✓';
+      position: absolute;
+      right: 0;
+      color: var(--success);
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .header {
+        padding: 10px 16px;
+      }
+
+      .header-inner {
+        flex-wrap: wrap;
+      }
+
+      .logo-text p {
+        display: none;
+      }
+
+      .device-name {
+        display: none;
+      }
+
+      .main-content {
+        padding: 16px;
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .dash-card {
+        padding: 18px;
+      }
+
+      .modal {
+        max-height: 95vh;
+        border-radius: var(--radius-lg);
+      }
+
+      .modal-body {
+        padding: 16px;
+      }
+
+      .drop-zone {
+        padding: 32px 16px;
+      }
+
+      .btn-lg {
+        padding: 12px 20px;
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-status {
+        gap: 8px;
+      }
+
+      .connection-badge span:last-child {
+        display: none;
+      }
+
+      .tabs {
+        flex-wrap: wrap;
+      }
+    }
+
+    /* ===== UTILITY ===== */
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt-2 { margin-top: 8px; }
+    .mt-4 { margin-top: 16px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-4 { margin-bottom: 16px; }
+    .gap-2 { gap: 8px; }
+    .flex { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .w-full { width: 100%; }
+    .text-sm { font-size: 13px; }
+    .text-xs { font-size: 11px; }
+    .text-muted { color: var(--text-muted); }
+    .text-secondary { color: var(--text-secondary); }
+    .font-mono { font-family: monospace; }
+    .overflow-auto { overflow: auto; }
+    .select-none { user-select: none; }
+
+    /* ===== CHAR COUNTER ===== */
+    .char-counter {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: left;
+      margin-top: 4px;
+      direction: ltr;
+    }
+
+    /* ===== FILE TYPE BADGE ===== */
+    .file-type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      background: rgba(79, 124, 255, 0.15);
+      color: var(--accent-blue);
+    }
+
+    /* ===== NETWORK INFO ===== */
+    .network-info {
+      background: rgba(245, 158, 11, 0.05);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin: 12px 0;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .network-info-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Focus visible */
+    :focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+    }
+
+    button:focus:not(:focus-visible) {
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="root" style="display:none"></div>
+
+  <!-- ===== APP ===== -->
+  <div id="app">
+    <!-- HEADER -->
+    <header class="header" role="banner">
+      <div class="header-inner">
+        <div class="logo-section">
+          <div class="logo-icon" aria-hidden="true">📡</div>
+          <div class="logo-text">
+            <h1>LOCAL SHARE</h1>
+            <p>اشتراک‌گذاری خصوصی بین دستگاه‌ها</p>
+          </div>
+        </div>
+        <div class="header-status">
+          <div class="connection-badge" id="connectionBadge" role="status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span id="connectionText">قطع شده</span>
+          </div>
+          <span class="device-name" id="deviceNameDisplay" title="کلیک برای تغییر نام" tabindex="0" role="button" aria-label="تغییر نام دستگاه"></span>
+          <div class="header-actions">
+            <button class="icon-btn" id="btnCommandPalette" title="Command Palette (Ctrl+K)" aria-label="Command Palette">⌘</button>
+            <button class="icon-btn" id="btnSettings" title="تنظیمات" aria-label="تنظیمات">⚙</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" role="main">
+      <!-- Dashboard Cards -->
+      <div class="dashboard-grid" id="dashboardGrid">
+        <div class="dash-card" id="cardConnect" tabindex="0" role="button" aria-label="اتصال">
+          <div class="dash-card-icon blue">🔗</div>
+          <h3>اتصال</h3>
+          <p>ساخت یا پیوستن به اتاق برای برقراری اتصال WebRTC</p>
+        </div>
+        <div class="dash-card" id="cardFile" tabindex="0" role="button" aria-label="ارسال فایل">
+          <div class="dash-card-icon cyan">📁</div>
+          <h3>ارسال فایل</h3>
+          <p>انتقال هر نوع فایل با پشتیبانی از Drag & Drop</p>
+        </div>
+        <div class="dash-card" id="cardText" tabindex="0" role="button" aria-label="ارسال متن">
+          <div class="dash-card-icon purple">✏️</div>
+          <h3>ارسال متن</h3>
+          <p>ارسال و دریافت متن بین دستگاه‌ها</p>
+        </div>
+        <div class="dash-card" id="cardImage" tabindex="0" role="button" aria-label="ارسال تصویر">
+          <div class="dash-card-icon green">🖼️</div>
+          <h3>ارسال تصویر</h3>
+          <p>اشتراک‌گذاری سریع تصویر با Preview</p>
+        </div>
+        <div class="dash-card" id="cardClipboard" tabindex="0" role="button" aria-label="اشتراک‌گذاری کلیپ‌بورد">
+          <div class="dash-card-icon orange">📋</div>
+          <h3>کلیپ‌بورد</h3>
+          <p>کپی و ارسال محتوای کلیپ‌بورد</p>
+        </div>
+        <div class="dash-card" id="cardHistory" tabindex="0" role="button" aria-label="تاریخچه">
+          <div class="dash-card-icon pink">📜</div>
+          <h3>تاریخچه</h3>
+          <p>مشاهده انتقال‌های قبلی</p>
+        </div>
+      </div>
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone" role="region" aria-label="ناحیه رها کردن فایل">
+        <div class="drop-zone-icon">📂</div>
+        <h3>فایل‌ها را اینجا رها کنید</h3>
+        <p>یا از دکمه زیر برای انتخاب فایل استفاده کنید</p>
+        <button class="btn btn-primary mt-4" id="btnSelectFile">انتخاب فایل</button>
+        <input type="file" id="fileInput" multiple style="display:none" aria-hidden="true">
+      </div>
+
+      <!-- Active Transfers -->
+      <div id="activeTransfers" class="hidden">
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">انتقال‌های فعال</h3>
+        <div id="transfersList"></div>
+      </div>
+
+      <!-- Received Files -->
+      <div id="receivedSection" class="hidden">
+        <h3 style="font-size:16px;margin-bottom:12px;color:var(--text-primary)">فایل‌های دریافت‌شده</h3>
+        <div id="receivedList"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- Connection Modal -->
+  <div class="modal-overlay" id="modalConnect" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="connectTitle">🔗 اتصال</h2>
+        <button class="modal-close" data-close="modalConnect" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="tabs" role="tablist">
+          <button class="tab active" id="tabCreate" role="tab" aria-selected="true">ساخت اتاق</button>
+          <button class="tab" id="tabJoin" role="tab" aria-selected="false">پیوستن به اتاق</button>
+        </div>
+
+        <!-- Create Room -->
+        <div id="panelCreate">
+          <div id="createStep1">
+            <div class="step-indicator">
+              <span class="step-number">۱</span>
+              <span class="step-text">ساخت اتاق و ایجاد Offer</span>
+            </div>
+            <button class="btn btn-primary w-full" id="btnCreateOffer">ساخت اتاق</button>
+            <div class="network-info mt-4">
+              <span class="network-info-icon">⚠️</span>
+              <span>WebRTC برای برقراری اتصال ممکن است به شرایط شبکه و مرورگر وابسته باشد. برای دو دستگاه در یک شبکه محلی، اتصال مستقیم معمولاً امکان‌پذیر است.</span>
+            </div>
+          </div>
+          <div id="createStep2" class="hidden">
+            <div class="step-indicator">
+              <span class="step-number">۲</span>
+              <span class="step-text">Offer ساخته شد — آن را برای دستگاه دیگر ارسال کنید</span>
+            </div>
+            <div class="signaling-data" id="offerData" dir="ltr"></div>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn btn-secondary btn-sm" id="btnCopyOffer">📋 کپی Offer</button>
+              <button class="btn btn-secondary btn-sm" id="btnQROffer">📱 ساخت QR</button>
+            </div>
+            <div id="qrOfferContainer" class="hidden"></div>
+            <div class="step-indicator mt-4">
+              <span class="step-number">۳</span>
+              <span class="step-text">Answer دستگاه دیگر را وارد کنید</span>
+            </div>
+            <textarea class="form-textarea" id="inputAnswer" placeholder="Answer را اینجا وارد کنید..." dir="ltr" style="font-family:monospace;font-size:11px;min-height:80px"></textarea>
+            <button class="btn btn-primary w-full mt-2" id="btnSetAnswer">برقراری اتصال</button>
+          </div>
+          <div id="createStep3" class="hidden">
+            <div class="text-center" style="padding:20px">
+              <div style="font-size:48px;margin-bottom:12px">⏳</div>
+              <p>در انتظار اتصال...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Join Room -->
+        <div id="panelJoin" class="hidden">
+          <div id="joinStep1">
+            <div class="step-indicator">
+              <span class="step-number">۱</span>
+              <span class="step-text">Offer دریافتی را وارد کنید</span>
+            </div>
+            <textarea class="form-textarea" id="inputOffer" placeholder="Offer را اینجا وارد کنید..." dir="ltr" style="font-family:monospace;font-size:11px;min-height:100px"></textarea>
+            <button class="btn btn-primary w-full mt-2" id="btnProcessOffer">ایجاد Answer</button>
+          </div>
+          <div id="joinStep2" class="hidden">
+            <div class="step-indicator">
+              <span class="step-number">۲</span>
+              <span class="step-text">Answer ساخته شد — آن را برای دستگاه اول ارسال کنید</span>
+            </div>
+            <div class="signaling-data" id="answerData" dir="ltr"></div>
+            <div class="flex gap-2 flex-wrap">
+              <button class="btn btn-secondary btn-sm" id="btnCopyAnswer">📋 کپی Answer</button>
+              <button class="btn btn-secondary btn-sm" id="btnQRAnswer">📱 ساخت QR</button>
+            </div>
+            <div id="qrAnswerContainer" class="hidden"></div>
+            <div class="text-center mt-4" style="padding:16px">
+              <div style="font-size:36px;margin-bottom:8px">⏳</div>
+              <p class="text-sm text-muted">در انتظار برقراری اتصال...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Security Info -->
+        <div class="security-box">
+          <h4>🔒 امنیت</h4>
+          <ul>
+            <li>فایل‌ها مستقیماً بین مرورگرها منتقل می‌شوند</li>
+            <li>هیچ سروری در مسیر انتقال وجود ندارد</li>
+            <li>Signaling به صورت دستی بین دو دستگاه منتقل می‌شود</li>
+            <li>برنامه نیازی به حساب کاربری ندارد</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Modal -->
+  <div class="modal-overlay" id="modalText" role="dialog" aria-modal="true" aria-labelledby="textTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="textTitle">✏️ ارسال متن</h2>
+        <button class="modal-close" data-close="modalText" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="textInput">متن خود را وارد کنید</label>
+          <textarea class="form-textarea" id="textInput" placeholder="متن را اینجا بنویسید..." style="min-height:150px"></textarea>
+          <div class="char-counter" id="charCounter">0 حرف</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary" id="btnSendText">ارسال</button>
+          <button class="btn btn-secondary" id="btnClearText">پاک کردن</button>
+        </div>
+        <div id="receivedTextSection" class="hidden mt-4">
+          <h4 style="font-size:14px;margin-bottom:8px">📨 متن دریافت‌شده</h4>
+          <div class="text-received" id="receivedTextContent"></div>
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-secondary btn-sm" id="btnCopyReceivedText">📋 کپی</button>
+            <button class="btn btn-secondary btn-sm" id="btnSaveReceivedText">💾 ذخیره TXT</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div class="modal-overlay" id="modalImage" role="dialog" aria-modal="true" aria-labelledby="imageTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="imageTitle">🖼️ ارسال تصویر</h2>
+        <button class="modal-close" data-close="modalImage" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="drop-zone" id="imageDropZone" style="padding:24px">
+          <div class="drop-zone-icon">🖼️</div>
+          <h3>تصویر را رها کنید یا Paste کنید</h3>
+          <button class="btn btn-primary mt-2" id="btnSelectImage">انتخاب تصویر</button>
+          <input type="file" id="imageInput" accept="image/*" style="display:none">
+        </div>
+        <div id="imagePreviewSection" class="hidden">
+          <img class="image-preview" id="imagePreview" alt="Preview">
+          <div class="flex justify-between items-center mt-2">
+            <div>
+              <div class="text-sm" id="imageName"></div>
+              <div class="text-xs text-muted" id="imageMeta"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btnSendImage">ارسال تصویر</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clipboard Modal -->
+  <div class="modal-overlay" id="modalClipboard" role="dialog" aria-modal="true" aria-labelledby="clipboardTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="clipboardTitle">📋 کلیپ‌بورد</h2>
+        <button class="modal-close" data-close="modalClipboard" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-secondary mb-4">محتوای کلیپ‌بورد خود را ارسال کنید یا کلیپ‌بورد دریافتی را کپی کنید.</p>
+        <div class="flex gap-2 flex-wrap">
+          <button class="btn btn-primary" id="btnReadClipboard">📖 خواندن کلیپ‌بورد</button>
+          <button class="btn btn-secondary" id="btnSendClipboard">📤 ارسال کلیپ‌بورد</button>
+        </div>
+        <div id="clipboardContent" class="hidden mt-4">
+          <div class="text-received" id="clipboardText"></div>
+        </div>
+        <div id="receivedClipboardSection" class="hidden mt-4">
+          <h4 style="font-size:14px;margin-bottom:8px">📨 کلیپ‌بورد دریافت‌شده</h4>
+          <div class="text-received" id="receivedClipboardContent"></div>
+          <button class="btn btn-secondary btn-sm mt-2" id="btnCopyReceivedClipboard">📋 کپی به کلیپ‌بورد</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div class="modal-overlay" id="modalHistory" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="historyTitle">📜 تاریخچه انتقال</h2>
+        <button class="modal-close" data-close="modalHistory" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="historyList"></div>
+        <div class="flex justify-between items-center mt-4">
+          <button class="btn btn-danger btn-sm" id="btnClearHistory">🗑️ پاک کردن تاریخچه</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="modalSettings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="settingsTitle">⚙️ تنظیمات</h2>
+        <button class="modal-close" data-close="modalSettings" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">نام دستگاه</label>
+          <input class="form-input" id="settingDeviceName" placeholder="نام دستگاه خود را وارد کنید">
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Theme</div>
+            <div class="setting-desc">ظاهر برنامه</div>
+          </div>
+          <select class="form-input" id="settingTheme" style="width:auto;min-width:120px">
+            <option value="dark">تاریک</option>
+            <option value="light">روشن</option>
+            <option value="system">سیستم</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">دانلود خودکار</div>
+            <div class="setting-desc">فایل‌های دریافتی خودکار دانلود شوند</div>
+          </div>
+          <button class="toggle" id="settingAutoDownload" role="switch" aria-label="دانلود خودکار"></button>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">صدای اعلان</div>
+            <div class="setting-desc">پخش صدا هنگام دریافت فایل</div>
+          </div>
+          <button class="toggle" id="settingSound" role="switch" aria-label="صدای اعلان"></button>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">نمایش سرعت</div>
+            <div class="setting-desc">نمایش سرعت انتقال در Progress</div>
+          </div>
+          <button class="toggle active" id="settingSpeed" role="switch" aria-label="نمایش سرعت"></button>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">اندازه Chunk</div>
+            <div class="setting-desc">اندازه هر بسته داده (KB)</div>
+          </div>
+          <select class="form-input" id="settingChunkSize" style="width:auto;min-width:100px">
+            <option value="16384">16 KB</option>
+            <option value="32768">32 KB</option>
+            <option value="65536" selected>64 KB</option>
+            <option value="131072">128 KB</option>
+            <option value="262144">256 KB</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Diagnostics</div>
+            <div class="setting-desc">نمایش اطلاعات عیب‌یابی</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnDiagnostics">مشاهده</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diagnostics Modal -->
+  <div class="modal-overlay" id="modalDiagnostics" role="dialog" aria-modal="true" aria-labelledby="diagTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="diagTitle">🔧 Diagnostics</h2>
+        <button class="modal-close" data-close="modalDiagnostics" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="diagContent"></div>
+        <button class="btn btn-secondary w-full mt-4" id="btnCopyDiag">📋 کپی Diagnostics</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Send Modal (Queue) -->
+  <div class="modal-overlay" id="modalFileQueue" role="dialog" aria-modal="true" aria-labelledby="fileQueueTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="fileQueueTitle">📁 صف ارسال فایل</h2>
+        <button class="modal-close" data-close="modalFileQueue" aria-label="بستن">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="fileQueueList"></div>
+        <div class="empty-state" id="fileQueueEmpty">
+          <div class="empty-state-icon">📭</div>
+          <p>فایلی در صف نیست</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Palette -->
+  <div class="command-palette" id="commandPalette" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <div class="command-box">
+      <input class="command-input" id="commandInput" placeholder="جستجوی دستور..." autocomplete="off">
+      <div class="command-list" id="commandList" role="listbox"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- ===== JAVASCRIPT ===== -->
+  <script>
+  (function() {
+    'use strict';
+
+    // ==========================================
+    // APP STATE
+    // ==========================================
+    const State = {
+      deviceName: '',
+      connectionState: 'disconnected', // disconnected, connecting, connected, failed
+      peerConnection: null,
+      dataChannel: null,
+      isCreator: false,
+      settings: {
+        theme: 'dark',
+        autoDownload: false,
+        sound: true,
+        showSpeed: true,
+        chunkSize: 65536
+      },
+      transfers: new Map(),
+      receivedFiles: [],
+      history: [],
+      fileQueue: [],
+      currentTransferId: 0,
+      connectionTime: null,
+      receivedText: null,
+      receivedClipboard: null,
+      selectedImage: null,
+      clipboardContent: null,
+      objectUrls: []
+    };
+
+    // ==========================================
+    // STORAGE MANAGER
+    // ==========================================
+    const Storage = {
+      get(key, fallback) {
+        try {
+          const v = localStorage.getItem('localshare_' + key);
+          return v !== null ? JSON.parse(v) : fallback;
+        } catch { return fallback; }
+      },
+      set(key, value) {
+        try { localStorage.setItem('localshare_' + key, JSON.stringify(value)); } catch {}
+      },
+      remove(key) {
+        try { localStorage.removeItem('localshare_' + key); } catch {}
+      }
+    };
+
+    // ==========================================
+    // TOAST MANAGER
+    // ==========================================
+    const Toast = {
+      container: null,
+      init() { this.container = document.getElementById('toastContainer'); },
+      show(message, type = 'info', duration = 4000) {
+        const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span></span>`;
+        toast.querySelector('span:last-child').textContent = message;
+        this.container.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.add('removing');
+          setTimeout(() => toast.remove(), 300);
+        }, duration);
+      }
+    };
+
+    // ==========================================
+    // UI MANAGER
+    // ==========================================
+    const UI = {
+      openModal(id) {
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+      },
+      closeModal(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+      },
+      closeAllModals() {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => {
+          m.classList.remove('active');
+        });
+        document.getElementById('commandPalette').classList.remove('active');
+        document.body.style.overflow = '';
+      },
+      updateConnectionBadge() {
+        const badge = document.getElementById('connectionBadge');
+        const text = document.getElementById('connectionText');
+        badge.classList.remove('connected', 'connecting');
+        const states = {
+          disconnected: ['قطع شده', ''],
+          connecting: ['در حال اتصال', 'connecting'],
+          connected: ['متصل', 'connected'],
+          failed: ['اتصال ناموفق', '']
+        };
+        const [label, cls] = states[State.connectionState] || states.disconnected;
+        text.textContent = label;
+        if (cls) badge.classList.add(cls);
+      },
+      updateDeviceName() {
+        document.getElementById('deviceNameDisplay').textContent = State.deviceName || 'دستگاه ناشناس';
+      },
+      formatSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      },
+      formatTime(seconds) {
+        if (seconds < 60) return Math.round(seconds) + ' ثانیه';
+        if (seconds < 3600) return Math.round(seconds / 60) + ' دقیقه';
+        return Math.round(seconds / 3600) + ' ساعت';
+      },
+      generateId() {
+        return 'f_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      }
+    };
+
+    // ==========================================
+    // HISTORY MANAGER
+    // ==========================================
+    const History = {
+      load() {
+        State.history = Storage.get('history', []);
+      },
+      add(entry) {
+        State.history.unshift({
+          ...entry,
+          timestamp: Date.now()
+        });
+        if (State.history.length > 100) State.history = State.history.slice(0, 100);
+        Storage.set('history', State.history);
+      },
+      clear() {
+        State.history = [];
+        Storage.set('history', []);
+      },
+      render() {
+        const list = document.getElementById('historyList');
+        if (State.history.length === 0) {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>تاریخچه‌ای وجود ندارد</p></div>';
+          return;
+        }
+        list.innerHTML = '';
+        State.history.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'history-item';
+          const iconMap = { file: '📁', text: '✏️', image: '🖼️', clipboard: '📋' };
+          const typeLabels = { sent: 'ارسال شد', received: 'دریافت شد' };
+          const date = new Date(item.timestamp);
+          const timeStr = date.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+          div.innerHTML = `
+            <div class="history-icon" style="background:rgba(79,124,255,0.1)">${iconMap[item.type] || '📄'}</div>
+            <div class="history-info">
+              <div class="history-name"></div>
+              <div class="history-meta"></div>
+            </div>
+          `;
+          div.querySelector('.history-name').textContent = item.name;
+          div.querySelector('.history-meta').textContent = `${UI.formatSize(item.size || 0)} • ${typeLabels[item.direction] || ''} • ${timeStr}`;
+          list.appendChild(div);
+        });
+      }
+    };
+
+    // ==========================================
+    // SETTINGS MANAGER
+    // ==========================================
+    const Settings = {
+      load() {
+        const saved = Storage.get('settings', null);
+        if (saved) Object.assign(State.settings, saved);
+        State.deviceName = Storage.get('deviceName', '');
+        if (!State.deviceName) {
+          State.deviceName = 'DEVICE-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+          Storage.set('deviceName', State.deviceName);
+        }
+        this.applyTheme();
+      },
+      save() {
+        Storage.set('settings', State.settings);
+        Storage.set('deviceName', State.deviceName);
+      },
+      applyTheme() {
+        let theme = State.settings.theme;
+        if (theme === 'system') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      },
+      render() {
+        document.getElementById('settingDeviceName').value = State.deviceName;
+        document.getElementById('settingTheme').value = State.settings.theme;
+        document.getElementById('settingChunkSize').value = State.settings.chunkSize;
+        this.renderToggle('settingAutoDownload', State.settings.autoDownload);
+        this.renderToggle('settingSound', State.settings.sound);
+        this.renderToggle('settingSpeed', State.settings.showSpeed);
+      },
+      renderToggle(id, active) {
+        const el = document.getElementById(id);
+        if (active) el.classList.add('active');
+        else el.classList.remove('active');
+      }
+    };
+
+    // ==========================================
+    // WEBRTC MANAGER
+    // ==========================================
+    const WebRTC = {
+      createConnection() {
+        const config = {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        };
+        State.peerConnection = new RTCPeerConnection(config);
+        
+        State.peerConnection.oniceconnectionstatechange = () => {
+          const iceState = State.peerConnection.iceConnectionState;
+          if (iceState === 'connected' || iceState === 'completed') {
+            State.connectionState = 'connected';
+            State.connectionTime = Date.now();
+            UI.updateConnectionBadge();
+            Toast.show('اتصال برقرار شد!', 'success');
+          } else if (iceState === 'disconnected' || iceState === 'failed') {
+            State.connectionState = 'failed';
+            UI.updateConnectionBadge();
+            Toast.show('اتصال قطع شد', 'error');
+          } else if (iceState === 'checking') {
+            State.connectionState = 'connecting';
+            UI.updateConnectionBadge();
+          }
+        };
+
+        State.peerConnection.onconnectionstatechange = () => {
+          const connState = State.peerConnection.connectionState;
+          if (connState === 'connected') {
+            State.connectionState = 'connected';
+            State.connectionTime = Date.now();
+            UI.updateConnectionBadge();
+          } else if (connState === 'disconnected' || connState === 'failed' || connState === 'closed') {
+            State.connectionState = 'disconnected';
+            UI.updateConnectionBadge();
+          }
+        };
+
+        return State.peerConnection;
+      },
+
+      createDataChannel() {
+        const dc = State.peerConnection.createDataChannel('localshare', {
+          ordered: true
+        });
+        this.setupDataChannel(dc);
+        return dc;
+      },
+
+      setupDataChannel(dc) {
+        State.dataChannel = dc;
+        
+        dc.onopen = () => {
+          State.connectionState = 'connected';
+          State.connectionTime = Date.now();
+          UI.updateConnectionBadge();
+          Toast.show('DataChannel برقرار شد ✓', 'success');
+        };
+
+        dc.onclose = () => {
+          State.connectionState = 'disconnected';
+          UI.updateConnectionBadge();
+        };
+
+        dc.onerror = (e) => {
+          Toast.show('خطای DataChannel: ' + (e.error?.message || 'نامشخص'), 'error');
+        };
+
+        dc.onmessage = (event) => {
+          MessageHandler.handle(event.data);
+        };
+      },
+
+      async createOffer() {
+        this.createConnection();
+        this.createDataChannel();
+        const offer = await State.peerConnection.createOffer();
+        await State.peerConnection.setLocalDescription(offer);
+        
+        // Wait for ICE gathering
+        await this.waitForIceGathering();
+        return JSON.stringify(State.peerConnection.localDescription);
+      },
+
+      async processOffer(offerStr) {
+        this.createConnection();
+        
+        State.peerConnection.ondatachannel = (event) => {
+          this.setupDataChannel(event.channel);
+        };
+
+        const offer = JSON.parse(offerStr);
+        await State.peerConnection.setRemoteDescription(offer);
+        const answer = await State.peerConnection.createAnswer();
+        await State.peerConnection.setLocalDescription(answer);
+        
+        await this.waitForIceGathering();
+        return JSON.stringify(State.peerConnection.localDescription);
+      },
+
+      async setAnswer(answerStr) {
+        const answer = JSON.parse(answerStr);
+        await State.peerConnection.setRemoteDescription(answer);
+      },
+
+      waitForIceGathering() {
+        return new Promise((resolve) => {
+          if (State.peerConnection.iceGatheringState === 'complete') {
+            resolve();
+            return;
+          }
+          const check = () => {
+            if (State.peerConnection.iceGatheringState === 'complete') {
+              State.peerConnection.removeEventListener('icegatheringstatechange', check);
+              resolve();
+            }
+          };
+          State.peerConnection.addEventListener('icegatheringstatechange', check);
+          // Timeout after 5 seconds
+          setTimeout(resolve, 5000);
+        });
+      },
+
+      send(data) {
+        if (!State.dataChannel || State.dataChannel.readyState !== 'open') {
+          Toast.show('DataChannel متصل نیست', 'error');
+          return false;
+        }
+        try {
+          State.dataChannel.send(data);
+          return true;
+        } catch (e) {
+          Toast.show('خطا در ارسال: ' + e.message, 'error');
+          return false;
+        }
+      },
+
+      getDiagnostics() {
+        const pc = State.peerConnection;
+        const dc = State.dataChannel;
+        return {
+          webrtc: typeof RTCPeerConnection !== 'undefined',
+          dataChannel: dc ? dc.readyState : 'NOT_CREATED',
+          iceConnection: pc ? pc.iceConnectionState : 'NO_CONNECTION',
+          signaling: pc ? pc.signalingState : 'STABLE',
+          connectionState: pc ? pc.connectionState : 'NEW',
+          browser: navigator.userAgent.split(' ').pop(),
+          uptime: State.connectionTime ? Math.round((Date.now() - State.connectionTime) / 1000) + 's' : 'N/A',
+          activeTransfers: State.transfers.size,
+          queuedFiles: State.fileQueue.length
+        };
+      },
+
+      cleanup() {
+        if (State.dataChannel) {
+          State.dataChannel.close();
+          State.dataChannel = null;
+        }
+        if (State.peerConnection) {
+          State.peerConnection.close();
+          State.peerConnection = null;
+        }
+        State.connectionState = 'disconnected';
+        State.connectionTime = null;
+        UI.updateConnectionBadge();
+      }
+    };
+
+    // ==========================================
+    // TRANSFER MANAGER
+    // ==========================================
+    const Transfer = {
+      sendFile(file) {
+        const id = UI.generateId();
+        const transfer = {
+          id,
+          name: file.name,
+          size: file.size,
+          mime: file.type || 'application/octet-stream',
+          direction: 'sent',
+          progress: 0,
+          speed: 0,
+          startTime: Date.now(),
+          status: 'sending',
+          file
+        };
+        State.transfers.set(id, transfer);
+        this.renderTransfers();
+        document.getElementById('activeTransfers').classList.remove('hidden');
+
+        // Send metadata
+        const meta = JSON.stringify({
+          type: 'file-start',
+          id,
+          name: file.name,
+          size: file.size,
+          mime: file.type || 'application/octet-stream'
+        });
+
+        if (!WebRTC.send(meta)) {
+          transfer.status = 'failed';
+          this.renderTransfers();
+          return;
+        }
+
+        // Send chunks
+        this.sendChunks(id, file);
+      },
+
+      async sendChunks(id, file) {
+        const chunkSize = State.settings.chunkSize;
+        const transfer = State.transfers.get(id);
+        let offset = 0;
+
+        const sendNext = () => {
+          if (!State.dataChannel || State.dataChannel.readyState !== 'open') {
+            transfer.status = 'failed';
+            this.renderTransfers();
+            return;
+          }
+
+          // Backpressure
+          if (State.dataChannel.bufferedAmount > 10 * 1024 * 1024) {
+            setTimeout(sendNext, 100);
+            return;
+          }
+
+          if (offset >= file.size) {
+            // Send end marker
+            WebRTC.send(JSON.stringify({ type: 'file-end', id }));
+            transfer.status = 'completed';
+            transfer.progress = 100;
+            this.renderTransfers();
+            History.add({ type: 'file', name: file.name, size: file.size, direction: 'sent' });
+            Toast.show(`فایل "${file.name}" ارسال شد`, 'success');
+            
+            setTimeout(() => {
+              State.transfers.delete(id);
+              this.renderTransfers();
+              if (State.transfers.size === 0) {
+                document.getElementById('activeTransfers').classList.add('hidden');
+              }
+            }, 3000);
+            return;
+          }
+
+          const slice = file.slice(offset, offset + chunkSize);
+          const reader = new FileReader();
+          reader.onload = () => {
+            const buffer = reader.result;
+            try {
+              State.dataChannel.send(buffer);
+              offset += buffer.byteLength;
+              transfer.progress = Math.round((offset / file.size) * 100);
+              
+              const elapsed = (Date.now() - transfer.startTime) / 1000;
+              transfer.speed = offset / elapsed;
+              
+              this.renderTransfers();
+              
+              // Use setTimeout to avoid blocking
+              setTimeout(sendNext, 0);
+            } catch (e) {
+              transfer.status = 'failed';
+              this.renderTransfers();
+              Toast.show('خطا در ارسال فایل', 'error');
+            }
+          };
+          reader.onerror = () => {
+            transfer.status = 'failed';
+            this.renderTransfers();
+            Toast.show('خطا در خواندن فایل', 'error');
+          };
+          reader.readAsArrayBuffer(slice);
+        };
+
+        sendNext();
+      },
+
+      renderTransfers() {
+        const container = document.getElementById('transfersList');
+        container.innerHTML = '';
+        
+        State.transfers.forEach((t) => {
+          const div = document.createElement('div');
+          div.className = 'transfer-item';
+          
+          const elapsed = (Date.now() - t.startTime) / 1000;
+          const speed = elapsed > 0 ? t.size * (t.progress / 100) / elapsed : 0;
+          const remaining = speed > 0 ? (t.size - t.size * (t.progress / 100)) / speed : 0;
+          const sent = t.size * (t.progress / 100);
+
+          div.innerHTML = `
+            <div class="transfer-header">
+              <span class="transfer-name"></span>
+              <span class="transfer-size">${UI.formatSize(t.size)}</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%"></div></div>
+            <div class="transfer-details">
+              <span>${t.progress}% ${t.status === 'failed' ? '— خطا' : t.status === 'completed' ? '— کامل' : ''}</span>
+              <span>${State.settings.showSpeed ? UI.formatSize(speed) + '/s' : ''}</span>
+              <span>${UI.formatSize(sent)} / ${UI.formatSize(t.size)}</span>
+              ${remaining > 0 && t.status === 'sending' ? `<span>زمان باقی‌مانده: ${UI.formatTime(remaining)}</span>` : ''}
+            </div>
+          `;
+          div.querySelector('.transfer-name').textContent = t.name;
+          container.appendChild(div);
+        });
+      },
+
+      receiveFileStart(meta) {
+        const transfer = {
+          id: meta.id,
+          name: meta.name,
+          size: meta.size,
+          mime: meta.mime,
+          direction: 'received',
+          progress: 0,
+          chunks: [],
+          receivedSize: 0,
+          startTime: Date.now(),
+          status: 'receiving'
+        };
+        State.transfers.set(meta.id, transfer);
+        document.getElementById('activeTransfers').classList.remove('hidden');
+        this.renderTransfers();
+      },
+
+      receiveFileChunk(id, data) {
+        const transfer = State.transfers.get(id);
+        if (!transfer) return;
+        
+        const buffer = data instanceof ArrayBuffer ? data : data.buffer || data;
+        transfer.chunks.push(buffer);
+        transfer.receivedSize += buffer.byteLength || buffer.size || 0;
+        transfer.progress = Math.round((transfer.receivedSize / transfer.size) * 100);
+        this.renderTransfers();
+      },
+
+      receiveFileEnd(id) {
+        const transfer = State.transfers.get(id);
+        if (!transfer) return;
+
+        const blob = new Blob(transfer.chunks, { type: transfer.mime });
+        const url = URL.createObjectURL(blob);
+        State.objectUrls.push(url);
+
+        const receivedFile = {
+          id: transfer.id,
+          name: transfer.name,
+          size: transfer.size,
+          mime: transfer.mime,
+          url,
+          blob,
+          timestamp: Date.now()
+        };
+        State.receivedFiles.push(receivedFile);
+        this.renderReceived();
+
+        History.add({ type: transfer.mime.startsWith('image/') ? 'image' : 'file', name: transfer.name, size: transfer.size, direction: 'received' });
+        Toast.show(`فایل "${transfer.name}" دریافت شد`, 'success');
+
+        if (State.settings.autoDownload) {
+          this.downloadFile(receivedFile);
+        }
+
+        if (State.settings.sound) {
+          this.playNotification();
+        }
+
+        State.transfers.delete(id);
+        this.renderTransfers();
+        if (State.transfers.size === 0) {
+          setTimeout(() => document.getElementById('activeTransfers').classList.add('hidden'), 2000);
+        }
+      },
+
+      renderReceived() {
+        const container = document.getElementById('receivedList');
+        const section = document.getElementById('receivedSection');
+        section.classList.remove('hidden');
+        container.innerHTML = '';
+
+        State.receivedFiles.forEach(file => {
+          const div = document.createElement('div');
+          div.className = 'received-file';
+          
+          const isImage = file.mime.startsWith('image/');
+          const icon = isImage ? '🖼️' : '📄';
+          
+          div.innerHTML = `
+            <div class="received-file-icon">${icon}</div>
+            <div class="received-file-info">
+              <div class="received-file-name"></div>
+              <div class="received-file-meta">${UI.formatSize(file.size)} • ${file.mime}</div>
+            </div>
+            <button class="btn btn-primary btn-sm download-btn">⬇️ دانلود</button>
+          `;
+          div.querySelector('.received-file-name').textContent = file.name;
+          div.querySelector('.download-btn').addEventListener('click', () => this.downloadFile(file));
+          container.appendChild(div);
+        });
+      },
+
+      downloadFile(file) {
+        const a = document.createElement('a');
+        a.href = file.url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+
+      playNotification() {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 800;
+          gain.gain.value = 0.1;
+          osc.start();
+          osc.stop(ctx.currentTime + 0.15);
+        } catch {}
+      }
+    };
+
+    // ==========================================
+    // MESSAGE HANDLER
+    // ==========================================
+    const MessageHandler = {
+      handle(data) {
+        // Binary data = file chunk
+        if (data instanceof ArrayBuffer || data instanceof Blob) {
+          // Find current receiving transfer
+          const receiving = Array.from(State.transfers.values()).find(t => t.direction === 'received' && t.status === 'receiving');
+          if (receiving) {
+            Transfer.receiveFileChunk(receiving.id, data);
+          }
+          return;
+        }
+
+        // String data = JSON message
+        if (typeof data === 'string') {
+          try {
+            const msg = JSON.parse(data);
+            this.processMessage(msg);
+          } catch (e) {
+            // Not JSON, ignore
+          }
+        }
+      },
+
+      processMessage(msg) {
+        if (!msg || !msg.type) return;
+
+        switch (msg.type) {
+          case 'hello':
+            Toast.show('دستگاه دیگر متصل شد', 'info');
+            break;
+
+          case 'text':
+            State.receivedText = msg.text;
+            document.getElementById('receivedTextSection').classList.remove('hidden');
+            const textEl = document.getElementById('receivedTextContent');
+            textEl.textContent = msg.text;
+            Toast.show('متن دریافت شد', 'success');
+            if (State.settings.sound) Transfer.playNotification();
+            break;
+
+          case 'file-start':
+            Transfer.receiveFileStart(msg);
+            break;
+
+          case 'file-end':
+            Transfer.receiveFileEnd(msg.id);
+            break;
+
+          case 'clipboard':
+            State.receivedClipboard = msg.text;
+            document.getElementById('receivedClipboardSection').classList.remove('hidden');
+            const clipEl = document.getElementById('receivedClipboardContent');
+            clipEl.textContent = msg.text;
+            Toast.show('کلیپ‌بورد دریافت شد', 'success');
+            if (State.settings.sound) Transfer.playNotification();
+            break;
+
+          case 'ping':
+            WebRTC.send(JSON.stringify({ type: 'pong' }));
+            break;
+
+          case 'pong':
+            break;
+
+          default:
+            // Unknown message type, ignore
+            break;
+        }
+      }
+    };
+
+    // ==========================================
+    // QR CODE
+    // ==========================================
+    const QR = {
+      generate(data, containerId) {
+        const container = document.getElementById(containerId);
+        container.classList.remove('hidden');
+        container.innerHTML = '';
+
+        if (typeof qrcode === 'undefined') {
+          container.innerHTML = '<p class="text-sm text-muted" style="padding:12px">کتابخانه QR در دسترس نیست. از Copy/Paste استفاده کنید.</p>';
+          return;
+        }
+
+        try {
+          const qr = qrcode(0, 'M');
+          qr.addData(data);
+          qr.make();
+          
+          const div = document.createElement('div');
+          div.className = 'qr-container';
+          const img = document.createElement('img');
+          img.alt = 'QR Code';
+          img.src = qr.createDataURL(4, 4);
+          div.appendChild(img);
+          
+          const p = document.createElement('p');
+          p.className = 'text-xs text-muted';
+          p.textContent = 'QR Code را با دستگاه دیگر اسکن کنید';
+          p.style.color = '#333';
+          div.appendChild(p);
+          
+          container.appendChild(div);
+        } catch (e) {
+          container.innerHTML = '<p class="text-sm text-muted">خطا در ساخت QR Code. از Copy/Paste استفاده کنید.</p>';
+        }
+      }
+    };
+
+    // ==========================================
+    // COMMAND PALETTE
+    // ==========================================
+    const CommandPalette = {
+      commands: [
+        { id: 'file', icon: '📁', label: 'ارسال فایل', action: () => document.getElementById('fileInput').click() },
+        { id: 'text', icon: '✏️', label: 'ارسال متن', action: () => UI.openModal('modalText') },
+        { id: 'image', icon: '🖼️', label: 'ارسال تصویر', action: () => UI.openModal('modalImage') },
+        { id: 'clipboard', icon: '📋', label: 'اشتراک‌گذاری کلیپ‌بورد', action: () => UI.openModal('modalClipboard') },
+        { id: 'connect', icon: '🔗', label: 'ساخت اتاق', action: () => { UI.openModal('modalConnect'); document.getElementById('tabCreate').click(); } },
+        { id: 'join', icon: '🔗', label: 'پیوستن به اتاق', action: () => { UI.openModal('modalConnect'); document.getElementById('tabJoin').click(); } },
+        { id: 'history', icon: '📜', label: 'تاریخچه', action: () => { History.render(); UI.openModal('modalHistory'); } },
+        { id: 'settings', icon: '⚙️', label: 'تنظیمات', action: () => { Settings.render(); UI.openModal('modalSettings'); } },
+        { id: 'diag', icon: '🔧', label: 'Diagnostics', action: () => { Diagnostics.render(); UI.openModal('modalDiagnostics'); } }
+      ],
+      selectedIndex: 0,
+      
+      open() {
+        document.getElementById('commandPalette').classList.add('active');
+        const input = document.getElementById('commandInput');
+        input.value = '';
+        input.focus();
+        this.selectedIndex = 0;
+        this.render('');
+      },
+
+      close() {
+        document.getElementById('commandPalette').classList.remove('active');
+      },
+
+      render(filter) {
+        const list = document.getElementById('commandList');
+        list.innerHTML = '';
+        const filtered = this.commands.filter(c => c.label.includes(filter) || c.id.includes(filter.toLowerCase()));
+        
+        filtered.forEach((cmd, i) => {
+          const div = document.createElement('div');
+          div.className = 'command-item' + (i === this.selectedIndex ? ' selected' : '');
+          div.setAttribute('role', 'option');
+          div.innerHTML = `<span class="command-item-icon">${cmd.icon}</span><span></span>`;
+          div.querySelector('span:last-child').textContent = cmd.label;
+          div.addEventListener('click', () => {
+            cmd.action();
+            this.close();
+          });
+          list.appendChild(div);
+        });
+
+        this._filtered = filtered;
+      },
+
+      handleKey(e) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          this.selectedIndex = Math.min(this.selectedIndex + 1, (this._filtered?.length || 1) - 1);
+          this.render(document.getElementById('commandInput').value);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+          this.render(document.getElementById('commandInput').value);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (this._filtered && this._filtered[this.selectedIndex]) {
+            this._filtered[this.selectedIndex].action();
+            this.close();
+          }
+        }
+      }
+    };
+
+    // ==========================================
+    // DIAGNOSTICS
+    // ==========================================
+    const Diagnostics = {
+      render() {
+        const diag = WebRTC.getDiagnostics();
+        const container = document.getElementById('diagContent');
+        container.innerHTML = '';
+
+        const items = [
+          ['WebRTC پشتیبانی می‌شود', diag.webrtc ? 'YES' : 'NO', diag.webrtc ? 'yes' : 'no'],
+          ['DataChannel', diag.dataChannel, diag.dataChannel === 'open' ? 'connected' : 'disconnected'],
+          ['ICE Connection', diag.iceConnection, diag.iceConnection === 'connected' ? 'connected' : 'disconnected'],
+          ['Signaling State', diag.signaling, ''],
+          ['Connection State', diag.connectionState, diag.connectionState === 'connected' ? 'connected' : 'disconnected'],
+          ['Browser', diag.browser, ''],
+          ['Connection Uptime', diag.uptime, ''],
+          ['Active Transfers', String(diag.activeTransfers), ''],
+          ['Queued Files', String(diag.queuedFiles), '']
+        ];
+
+        items.forEach(([label, value, cls]) => {
+          const div = document.createElement('div');
+          div.className = 'diag-item';
+          div.innerHTML = `<span class="diag-label"></span><span class="diag-value ${cls}"></span>`;
+          div.querySelector('.diag-label').textContent = label;
+          div.querySelector('.diag-value').textContent = value;
+          container.appendChild(div);
+        });
+      },
+
+      getText() {
+        const diag = WebRTC.getDiagnostics();
+        return `LOCAL SHARE Diagnostics
+========================
+WebRTC: ${diag.webrtc ? 'YES' : 'NO'}
+DataChannel: ${diag.dataChannel}
+ICE: ${diag.iceConnection}
+Signaling: ${diag.signaling}
+Connection: ${diag.connectionState}
+Browser: ${diag.browser}
+Uptime: ${diag.uptime}
+Transfers: ${diag.activeTransfers}
+Queue: ${diag.queuedFiles}`;
+      }
+    };
+
+    // ==========================================
+    // CLIPBOARD MANAGER
+    // ==========================================
+    const Clipboard = {
+      async read() {
+        try {
+          const text = await navigator.clipboard.readText();
+          State.clipboardContent = text;
+          document.getElementById('clipboardContent').classList.remove('hidden');
+          document.getElementById('clipboardText').textContent = text;
+          Toast.show('کلیپ‌بورد خوانده شد', 'success');
+        } catch (e) {
+          Toast.show('دسترسی به کلیپ‌بورد ممکن نیست. اجازه دسترسی بدهید.', 'error');
+        }
+      },
+
+      send() {
+        if (!State.clipboardContent) {
+          Toast.show('ابتدا کلیپ‌بورد را بخوانید', 'warning');
+          return;
+        }
+        if (WebRTC.send(JSON.stringify({ type: 'clipboard', text: State.clipboardContent }))) {
+          Toast.show('کلیپ‌بورد ارسال شد', 'success');
+          History.add({ type: 'clipboard', name: 'کلیپ‌بورد', size: new Blob([State.clipboardContent]).size, direction: 'sent' });
+        }
+      },
+
+      async copyReceived() {
+        if (!State.receivedClipboard) return;
+        try {
+          await navigator.clipboard.writeText(State.receivedClipboard);
+          Toast.show('در کلیپ‌بورد کپی شد', 'success');
+        } catch {
+          Toast.show('کپی به کلیپ‌بورد ممکن نیست', 'error');
+        }
+      }
+    };
+
+    // ==========================================
+    // EVENT LISTENERS
+    // ==========================================
+    function initEvents() {
+      // Dashboard cards
+      document.getElementById('cardConnect').addEventListener('click', () => UI.openModal('modalConnect'));
+      document.getElementById('cardFile').addEventListener('click', () => document.getElementById('fileInput').click());
+      document.getElementById('cardText').addEventListener('click', () => UI.openModal('modalText'));
+      document.getElementById('cardImage').addEventListener('click', () => UI.openModal('modalImage'));
+      document.getElementById('cardClipboard').addEventListener('click', () => UI.openModal('modalClipboard'));
+      document.getElementById('cardHistory').addEventListener('click', () => { History.render(); UI.openModal('modalHistory'); });
+
+      // Header buttons
+      document.getElementById('btnCommandPalette').addEventListener('click', () => CommandPalette.open());
+      document.getElementById('btnSettings').addEventListener('click', () => { Settings.render(); UI.openModal('modalSettings'); });
+      document.getElementById('deviceNameDisplay').addEventListener('click', () => { Settings.render(); UI.openModal('modalSettings'); });
+
+      // Modal close buttons
+      document.querySelectorAll('[data-close]').forEach(btn => {
+        btn.addEventListener('click', () => UI.closeModal(btn.dataset.close));
+      });
+
+      // Modal overlay click to close
+      document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) UI.closeModal(overlay.id);
+        });
+      });
+
+      // Connection tabs
+      document.getElementById('tabCreate').addEventListener('click', () => {
+        document.getElementById('tabCreate').classList.add('active');
+        document.getElementById('tabCreate').setAttribute('aria-selected', 'true');
+        document.getElementById('tabJoin').classList.remove('active');
+        document.getElementById('tabJoin').setAttribute('aria-selected', 'false');
+        document.getElementById('panelCreate').classList.remove('hidden');
+        document.getElementById('panelJoin').classList.add('hidden');
+      });
+
+      document.getElementById('tabJoin').addEventListener('click', () => {
+        document.getElementById('tabJoin').classList.add('active');
+        document.getElementById('tabJoin').setAttribute('aria-selected', 'true');
+        document.getElementById('tabCreate').classList.remove('active');
+        document.getElementById('tabCreate').setAttribute('aria-selected', 'false');
+        document.getElementById('panelJoin').classList.remove('hidden');
+        document.getElementById('panelCreate').classList.add('hidden');
+      });
+
+      // Create offer
+      document.getElementById('btnCreateOffer').addEventListener('click', async () => {
+        try {
+          State.isCreator = true;
+          Toast.show('در حال ساخت اتاق...', 'info');
+          const offer = await WebRTC.createOffer();
+          document.getElementById('offerData').textContent = offer;
+          document.getElementById('createStep1').classList.add('hidden');
+          document.getElementById('createStep2').classList.remove('hidden');
+          Toast.show('Offer ساخته شد', 'success');
+        } catch (e) {
+          Toast.show('خطا در ساخت Offer: ' + e.message, 'error');
+        }
+      });
+
+      // Copy offer
+      document.getElementById('btnCopyOffer').addEventListener('click', () => {
+        const data = document.getElementById('offerData').textContent;
+        navigator.clipboard.writeText(data).then(() => Toast.show('Offer کپی شد', 'success')).catch(() => Toast.show('کپی ممکن نیست', 'error'));
+      });
+
+      // QR offer
+      document.getElementById('btnQROffer').addEventListener('click', () => {
+        const data = document.getElementById('offerData').textContent;
+        QR.generate(data, 'qrOfferContainer');
+      });
+
+      // Set answer
+      document.getElementById('btnSetAnswer').addEventListener('click', async () => {
+        const answerStr = document.getElementById('inputAnswer').value.trim();
+        if (!answerStr) { Toast.show('Answer را وارد کنید', 'warning'); return; }
+        try {
+          await WebRTC.setAnswer(answerStr);
+          document.getElementById('createStep2').classList.add('hidden');
+          document.getElementById('createStep3').classList.remove('hidden');
+          Toast.show('در حال برقراری اتصال...', 'info');
+        } catch (e) {
+          Toast.show('Signaling Data نامعتبر است: ' + e.message, 'error');
+        }
+      });
+
+      // Process offer (join)
+      document.getElementById('btnProcessOffer').addEventListener('click', async () => {
+        const offerStr = document.getElementById('inputOffer').value.trim();
+        if (!offerStr) { Toast.show('Offer را وارد کنید', 'warning'); return; }
+        try {
+          const answer = await WebRTC.processOffer(offerStr);
+          document.getElementById('answerData').textContent = answer;
+          document.getElementById('joinStep1').classList.add('hidden');
+          document.getElementById('joinStep2').classList.remove('hidden');
+          Toast.show('Answer ساخته شد', 'success');
+        } catch (e) {
+          Toast.show('Signaling Data نامعتبر است: ' + e.message, 'error');
+        }
+      });
+
+      // Copy answer
+      document.getElementById('btnCopyAnswer').addEventListener('click', () => {
+        const data = document.getElementById('answerData').textContent;
+        navigator.clipboard.writeText(data).then(() => Toast.show('Answer کپی شد', 'success')).catch(() => Toast.show('کپی ممکن نیست', 'error'));
+      });
+
+      // QR answer
+      document.getElementById('btnQRAnswer').addEventListener('click', () => {
+        const data = document.getElementById('answerData').textContent;
+        QR.generate(data, 'qrAnswerContainer');
+      });
+
+      // File input
+      document.getElementById('btnSelectFile').addEventListener('click', () => document.getElementById('fileInput').click());
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+        e.target.value = '';
+      });
+
+      // Drop zone
+      const dropZone = document.getElementById('dropZone');
+      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+      });
+      dropZone.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'BUTTON') document.getElementById('fileInput').click();
+      });
+
+      // Text modal
+      const textInput = document.getElementById('textInput');
+      textInput.addEventListener('input', () => {
+        document.getElementById('charCounter').textContent = textInput.value.length + ' حرف';
+      });
+
+      document.getElementById('btnSendText').addEventListener('click', () => {
+        const text = textInput.value.trim();
+        if (!text) { Toast.show('متنی وارد نشده', 'warning'); return; }
+        if (WebRTC.send(JSON.stringify({ type: 'text', text }))) {
+          Toast.show('متن ارسال شد', 'success');
+          History.add({ type: 'text', name: text.substring(0, 30) + (text.length > 30 ? '...' : ''), size: new Blob([text]).size, direction: 'sent' });
+          textInput.value = '';
+          document.getElementById('charCounter').textContent = '0 حرف';
+        }
+      });
+
+      document.getElementById('btnClearText').addEventListener('click', () => {
+        textInput.value = '';
+        document.getElementById('charCounter').textContent = '0 حرف';
+      });
+
+      document.getElementById('btnCopyReceivedText').addEventListener('click', () => {
+        if (State.receivedText) {
+          navigator.clipboard.writeText(State.receivedText).then(() => Toast.show('کپی شد', 'success')).catch(() => Toast.show('کپی ممکن نیست', 'error'));
+        }
+      });
+
+      document.getElementById('btnSaveReceivedText').addEventListener('click', () => {
+        if (State.receivedText) {
+          const blob = new Blob([State.receivedText], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'received-text.txt';
+          a.click();
+          URL.revokeObjectURL(url);
+          Toast.show('فایل ذخیره شد', 'success');
+        }
+      });
+
+      // Image modal
+      document.getElementById('btnSelectImage').addEventListener('click', () => document.getElementById('imageInput').click());
+      document.getElementById('imageInput').addEventListener('change', (e) => {
+        if (e.target.files[0]) handleImageSelect(e.target.files[0]);
+        e.target.value = '';
+      });
+
+      const imageDropZone = document.getElementById('imageDropZone');
+      imageDropZone.addEventListener('dragover', (e) => { e.preventDefault(); imageDropZone.classList.add('drag-over'); });
+      imageDropZone.addEventListener('dragleave', () => imageDropZone.classList.remove('drag-over'));
+      imageDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        imageDropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) handleImageSelect(file);
+      });
+
+      document.getElementById('btnSendImage').addEventListener('click', () => {
+        if (State.selectedImage) {
+          Transfer.sendFile(State.selectedImage);
+          State.selectedImage = null;
+          document.getElementById('imagePreviewSection').classList.add('hidden');
+          UI.closeModal('modalImage');
+        }
+      });
+
+      // Paste image
+      document.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) {
+              handleImageSelect(file);
+              UI.openModal('modalImage');
+            }
+            break;
+          }
+        }
+      });
+
+      // Clipboard modal
+      document.getElementById('btnReadClipboard').addEventListener('click', () => Clipboard.read());
+      document.getElementById('btnSendClipboard').addEventListener('click', () => Clipboard.send());
+      document.getElementById('btnCopyReceivedClipboard').addEventListener('click', () => Clipboard.copyReceived());
+
+      // History
+      document.getElementById('btnClearHistory').addEventListener('click', () => {
+        History.clear();
+        History.render();
+        Toast.show('تاریخچه پاک شد', 'success');
+      });
+
+      // Settings
+      document.getElementById('settingDeviceName').addEventListener('change', (e) => {
+        State.deviceName = e.target.value.trim() || State.deviceName;
+        Settings.save();
+        UI.updateDeviceName();
+        Toast.show('نام دستگاه ذخیره شد', 'success');
+      });
+
+      document.getElementById('settingTheme').addEventListener('change', (e) => {
+        State.settings.theme = e.target.value;
+        Settings.save();
+        Settings.applyTheme();
+      });
+
+      document.getElementById('settingChunkSize').addEventListener('change', (e) => {
+        State.settings.chunkSize = parseInt(e.target.value);
+        Settings.save();
+      });
+
+      ['settingAutoDownload', 'settingSound', 'settingSpeed'].forEach(id => {
+        document.getElementById(id).addEventListener('click', () => {
+          const key = id.replace('setting', '');
+          const map = { AutoDownload: 'autoDownload', Sound: 'sound', Speed: 'showSpeed' };
+          State.settings[map[key]] = !State.settings[map[key]];
+          Settings.renderToggle(id, State.settings[map[key]]);
+          Settings.save();
+        });
+      });
+
+      document.getElementById('btnDiagnostics').addEventListener('click', () => {
+        UI.closeModal('modalSettings');
+        Diagnostics.render();
+        UI.openModal('modalDiagnostics');
+      });
+
+      // Diagnostics
+      document.getElementById('btnCopyDiag').addEventListener('click', () => {
+        navigator.clipboard.writeText(Diagnostics.getText()).then(() => Toast.show('Diagnostics کپی شد', 'success')).catch(() => Toast.show('کپی ممکن نیست', 'error'));
+      });
+
+      // Command palette
+      document.getElementById('commandInput').addEventListener('input', (e) => {
+        CommandPalette.selectedIndex = 0;
+        CommandPalette.render(e.target.value);
+      });
+
+      document.getElementById('commandInput').addEventListener('keydown', (e) => {
+        CommandPalette.handleKey(e);
+      });
+
+      document.getElementById('commandPalette').addEventListener('click', (e) => {
+        if (e.target.id === 'commandPalette') CommandPalette.close();
+      });
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        // Ctrl+K: Command palette
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+          e.preventDefault();
+          CommandPalette.open();
+        }
+        // Ctrl+O: File select
+        if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+          e.preventDefault();
+          document.getElementById('fileInput').click();
+        }
+        // Ctrl+Enter: Send text
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          if (document.getElementById('modalText').classList.contains('active')) {
+            document.getElementById('btnSendText').click();
+          }
+        }
+        // Escape: Close modals
+        if (e.key === 'Escape') {
+          UI.closeAllModals();
+        }
+      });
+
+      // Global drag and drop
+      document.body.addEventListener('dragover', (e) => { e.preventDefault(); });
+      document.body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files.length > 0) {
+          handleFiles(e.dataTransfer.files);
+        }
+      });
+    }
+
+    // ==========================================
+    // FILE HANDLING
+    // ==========================================
+    function handleFiles(files) {
+      if (!files || files.length === 0) return;
+      
+      if (State.connectionState !== 'connected') {
+        Toast.show('ابتدا اتصال برقرار کنید', 'warning');
+        return;
+      }
+
+      for (const file of files) {
+        Transfer.sendFile(file);
+      }
+      
+      Toast.show(`${files.length} فایل به صف ارسال اضافه شد`, 'info');
+    }
+
+    function handleImageSelect(file) {
+      if (!file.type.startsWith('image/')) {
+        Toast.show('لطفاً یک تصویر انتخاب کنید', 'warning');
+        return;
+      }
+
+      State.selectedImage = file;
+      const preview = document.getElementById('imagePreview');
+      const url = URL.createObjectURL(file);
+      preview.src = url;
+      
+      const img = new Image();
+      img.onload = () => {
+        document.getElementById('imageName').textContent = file.name;
+        document.getElementById('imageMeta').textContent = `${img.width}×${img.height} • ${UI.formatSize(file.size)}`;
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = url;
+
+      document.getElementById('imagePreviewSection').classList.remove('hidden');
+    }
+
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+    function init() {
+      Toast.init();
+      Settings.load();
+      History.load();
+      UI.updateDeviceName();
+      UI.updateConnectionBadge();
+      initEvents();
+
+      // Check WebRTC support
+      if (typeof RTCPeerConnection === 'undefined') {
+        Toast.show('مرورگر شما از WebRTC پشتیبانی نمی‌کند', 'error', 10000);
+      }
+
+      // Periodic transfer update
+      setInterval(() => {
+        if (State.transfers.size > 0) {
+          Transfer.renderTransfers();
+        }
+      }, 1000);
+    }
+
+    // Start
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
